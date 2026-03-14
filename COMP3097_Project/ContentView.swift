@@ -148,8 +148,12 @@ struct GroupDetailView: View {
         }
     }
 
+    private var activeItems: [AppShoppingItem] {
+        items.filter { !$0.purchased }
+    }
+
     private var subtotal: Double {
-        items.reduce(0) { $0 + (Double($1.quantity) * $1.price) }
+        activeItems.reduce(0) { $0 + (Double($1.quantity) * $1.price) }
     }
 
     private var tax: Double {
