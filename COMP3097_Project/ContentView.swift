@@ -213,45 +213,74 @@ struct GroupDetailView: View {
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach($items) { $item in
-                                HStack(spacing: 12) {
-                                    Button {
-                                        item.purchased.toggle()
-                                    } label: {
-                                        Image(systemName: item.purchased ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(item.purchased ? .green : .secondary)
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    AsyncImage(url: URL(string: item.imageURL)) { phase in
-                                        switch phase {
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .scaledToFit()
-                                        case .failure(_):
-                                            Image(systemName: "photo")
-                                                .resizable()
-                                                .scaledToFit()
-                                                .foregroundStyle(.secondary)
-                                        case .empty:
-                                            ProgressView()
-                                        @unknown default:
-                                            EmptyView()
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 12) {
+                                        Button {
+                                            item.purchased.toggle()
+                                        } label: {
+                                            Image(systemName: item.purchased ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(item.purchased ? .green : .secondary)
                                         }
+                                        .buttonStyle(.plain)
+
+                                        AsyncImage(url: URL(string: item.imageURL)) { phase in
+                                            switch phase {
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .scaledToFit()
+                                            case .failure(_):
+                                                Image(systemName: "photo")
+                                                    .resizable()
+                                                    .scaledToFit()
+                                                    .foregroundStyle(.secondary)
+                                            case .empty:
+                                                ProgressView()
+                                            @unknown default:
+                                                EmptyView()
+                                            }
+                                        }
+                                        .frame(width: 45, height: 45)
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.name)
+                                                .strikethrough(item.purchased)
+                                                .lineLimit(2)
+
+                                            Text(String(format: "$%.2f  x %d", item.price, item.quantity))
+                                                .font(.footnote)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer()
                                     }
-                                    .frame(width: 45, height: 45)
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.name)
-                                            .strikethrough(item.purchased)
-                                            .lineLimit(2)
+                                    HStack(spacing: 12) {
+                                        Spacer()
 
-                                        Text(String(format: "$%.2f  x %d", item.price, item.quantity))
+                                        Button {
+                                            if item.quantity > 1 {
+                                                item.quantity -= 1
+                                            }
+                                        } label: {
+                                            Image(systemName: "minus.circle")
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Text("Qty \(item.quantity)")
                                             .font(.footnote)
                                             .foregroundStyle(.secondary)
-                                    }
+                                            .frame(minWidth: 52)
 
-                                    Spacer()
+                                        Button {
+                                            item.quantity += 1
+                                        } label: {
+                                            Image(systemName: "plus.circle")
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
                             }
                         }
