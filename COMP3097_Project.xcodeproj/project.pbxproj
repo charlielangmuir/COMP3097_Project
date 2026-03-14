@@ -16,6 +16,7 @@
 		2EEB63D82F62F8470043EBCF /* COMP3097_ProjectUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEB63D72F62F8470043EBCF /* COMP3097_ProjectUITestsLaunchTests.swift */; };
 		2EEB63E82F62F9A20043EBCF /* COMP3097_Project.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 2EEB63E62F62F9A20043EBCF /* COMP3097_Project.xcdatamodeld */; };
 		2EEB63EA2F62FADD0043EBCF /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEB63E92F62FADD0043EBCF /* PersistenceController.swift */; };
+		8E9F2B1E2F661F5A00718529 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E9F2B1D2F661F5700718529 /* APIService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +49,7 @@
 		2EEB63D72F62F8470043EBCF /* COMP3097_ProjectUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = COMP3097_ProjectUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		2EEB63E72F62F9A20043EBCF /* COMP3097_Project.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = COMP3097_Project.xcdatamodel; sourceTree = "<group>"; };
 		2EEB63E92F62FADD0043EBCF /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
+		8E9F2B1D2F661F5700718529 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,6 +100,7 @@
 		2EEB63B92F62F8450043EBCF /* COMP3097_Project */ = {
 			isa = PBXGroup;
 			children = (
+				8E9F2B1D2F661F5700718529 /* APIService.swift */,
 				2EEB63BA2F62F8450043EBCF /* COMP3097_ProjectApp.swift */,
 				2EEB63BC2F62F8450043EBCF /* ContentView.swift */,
 				2EEB63BE2F62F8460043EBCF /* Assets.xcassets */,
@@ -264,6 +267,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2EEB63E82F62F9A20043EBCF /* COMP3097_Project.xcdatamodeld in Sources */,
+				8E9F2B1E2F661F5A00718529 /* APIService.swift in Sources */,
 				2EEB63BD2F62F8450043EBCF /* ContentView.swift in Sources */,
 				2EEB63BB2F62F8450043EBCF /* COMP3097_ProjectApp.swift in Sources */,
 				2EEB63EA2F62FADD0043EBCF /* PersistenceController.swift in Sources */,

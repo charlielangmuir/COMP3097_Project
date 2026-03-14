@@ -68,16 +68,6 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - API Models
-struct APIProduct: Codable, Identifiable, Hashable {
-    let id: Int
-    let title: String
-    let price: Double
-    let description: String
-    let category: String
-    let image: String
-}
-
 // MARK: - App Models
 struct AppShoppingGroup: Identifiable, Hashable {
     let id = UUID()
@@ -94,24 +84,6 @@ struct AppShoppingItem: Identifiable, Hashable {
     var category: String
     var details: String
     var imageURL: String
-}
-
-// MARK: - API Service
-final class APIService {
-    static let shared = APIService()
-    private init() {}
-
-    func fetchProducts() async throws -> [APIProduct] {
-        let url = URL(string: "https://fakestoreapi.com/products")!
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              200...299 ~= httpResponse.statusCode else {
-            throw URLError(.badServerResponse)
-        }
-
-        return try JSONDecoder().decode([APIProduct].self, from: data)
-    }
 }
 
 // MARK: - 2) Groups Screen (Home)
