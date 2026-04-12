@@ -9,28 +9,59 @@ import XCTest
 @testable import COMP3097_Project
 
 final class COMP3097_ProjectTests: XCTestCase {
+    func testTaxSummaryWithoutCoupon() throws {
+        let items = [
+            CheckoutLineItem(
+                id: UUID(),
+                groupName: "Electronics",
+                itemName: "Headphones",
+                quantity: 1,
+                unitPrice: 100,
+                lineSubtotal: 100,
+                taxRate: 0.13,
+                taxAmount: 13
+            ),
+            CheckoutLineItem(
+                id: UUID(),
+                groupName: "Books",
+                itemName: "Notebook",
+                quantity: 2,
+                unitPrice: 10,
+                lineSubtotal: 20,
+                taxRate: 0,
+                taxAmount: 0
+            )
+        ]
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+        let summary = TaxCalculator.summary(items: items, coupon: nil)
+
+        XCTAssertEqual(summary.subtotal, 120, accuracy: 0.001)
+        XCTAssertEqual(summary.discount, 0, accuracy: 0.001)
+        XCTAssertEqual(summary.tax, 13, accuracy: 0.001)
+        XCTAssertEqual(summary.total, 133, accuracy: 0.001)
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
+    func testTaxSummaryWithPercentageCoupon() throws {
+        let items = [
+            CheckoutLineItem(
+                id: UUID(),
+                groupName: "Men's Clothing",
+                itemName: "Jacket",
+                quantity: 1,
+                unitPrice: 200,
+                lineSubtotal: 200,
+                taxRate: 0.10,
+                taxAmount: 20
+            )
+        ]
+        let coupon = CheckoutCoupon(code: "SAVE10", description: "10% off", kind: .percent, value: 0.10)
 
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
-    }
+        let summary = TaxCalculator.summary(items: items, coupon: coupon)
 
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
+        XCTAssertEqual(summary.subtotal, 200, accuracy: 0.001)
+        XCTAssertEqual(summary.discount, 20, accuracy: 0.001)
+        XCTAssertEqual(summary.taxableSubtotal, 180, accuracy: 0.001)
+        XCTAssertEqual(summary.tax, 18, accuracy: 0.001)
+        XCTAssertEqual(summary.total, 198, accuracy: 0.001)
     }
-
 }
