@@ -386,7 +386,7 @@ final class ShoppingStore: ObservableObject {
     }
 
     func pendingItemCount(for group: AppShoppingGroup) -> Int {
-        items(for: group).filter { !$0.purchased }.count
+        items(for: group).filter { $0.purchased }.count
     }
 
     func pendingCartCount() -> Int {
@@ -398,7 +398,7 @@ final class ShoppingStore: ObservableObject {
         let lineItems = groups.flatMap { group -> [CheckoutLineItem] in
             let rule = taxRule(for: group)
             return items(for: group)
-                .filter { !$0.purchased }
+                .filter { $0.purchased }
                 .map { item in
                     let lineSubtotal = item.price * Double(item.quantity)
                     let lineTax = rule.isTaxable ? lineSubtotal * rule.rate : 0
@@ -511,8 +511,8 @@ final class ShoppingStore: ObservableObject {
         for group in groups {
             let updated = items(for: group).map { item in
                 var changed = item
-                if !changed.purchased {
-                    changed.purchased = true
+                if changed.purchased {
+                    changed.purchased = false
                 }
                 return changed
             }
@@ -546,10 +546,36 @@ final class ShoppingStore: ObservableObject {
 
     private func loadStoredItems(for group: AppShoppingGroup) -> [AppShoppingItem] {
         do {
-            return try persistence.fetchItems(for: group)
+            let storedItems = try persistence.fetchItems(for: group)
+            let normalizedItems = normalizeInitialSelectionState(for: storedItems, group: group)
+
+            if normalizedItems != storedItems {
+                try persistence.replaceItems(normalizedItems, for: group)
+            }
+
+            return normalizedItems
         } catch {
             print("Failed to load items for \(group.name): \(error.localizedDescription)")
             return []
+        }
+    }
+
+    private func normalizeInitialSelectionState(for items: [AppShoppingItem], group: AppShoppingGroup) -> [AppShoppingItem] {
+        guard !group.isCustom, !items.isEmpty else {
+            return items
+        }
+
+        let allRemoteItems = items.allSatisfy { $0.remoteID != nil }
+        let allSelected = items.allSatisfy(\.purchased)
+
+        guard allRemoteItems, allSelected else {
+            return items
+        }
+
+        return items.map { item in
+            var updated = item
+            updated.purchased = false
+            return updated
         }
     }
 
@@ -784,7 +810,7 @@ struct GroupDetailView: View {
         case .featured:
             return { lhs, rhs in
                 if lhs.purchased != rhs.purchased {
-                    return !lhs.purchased && rhs.purchased
+                    return lhs.purchased && !rhs.purchased
                 }
 
                 return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
@@ -817,7 +843,7 @@ struct GroupDetailView: View {
     }
 
     private var preview: CheckoutPreview {
-        let lineItems = items.filter { !$0.purchased }.map { item in
+        let lineItems = items.filter { $0.purchased }.map { item in
             let rule = store.taxRule(for: group)
             let lineSubtotal = item.price * Double(item.quantity)
             return CheckoutLineItem(
@@ -1010,7 +1036,6 @@ struct GroupDetailView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.name)
-                            .strikethrough(item.purchased)
                             .lineLimit(2)
                             .foregroundStyle(.white)
 
@@ -1154,7 +1179,7 @@ struct ProductDetailView: View {
                                 detailRow(title: "Shopping Group", value: group.name)
                                 detailRow(title: "Unit Price", value: item.price.currencyText)
                                 detailRow(title: "Quantity", value: "\(item.quantity)")
-                                detailRow(title: "Status", value: item.purchased ? "Purchased" : "Active")
+                                detailRow(title: "Status", value: item.purchased ? "In Cart" : "Not in Cart")
 
                                 Divider()
                                     .overlay(Color.white.opacity(0.08))
@@ -1177,7 +1202,7 @@ struct ProductDetailView: View {
                                     .font(.headline)
                                     .foregroundStyle(.white)
 
-                                Button(item.purchased ? "Mark as Active" : "Mark as Purchased") {
+                                Button(item.purchased ? "Remove from Cart" : "Add to Cart") {
                                     var updated = item
                                     updated.purchased.toggle()
                                     store.updateItem(updated, in: group)
