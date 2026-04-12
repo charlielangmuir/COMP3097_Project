@@ -70,13 +70,16 @@ struct MainTabView: View {
 
 // MARK: - App Models
 struct AppShoppingGroup: Identifiable, Hashable {
-    let id = UUID()
+    let id: UUID
     var name: String
     var apiCategory: String
+    var isCustom: Bool
+    var isTaxable: Bool
 }
 
 struct AppShoppingItem: Identifiable, Hashable {
-    let id: Int
+    let id: UUID
+    var remoteID: Int?
     var name: String
     var price: Double
     var quantity: Int
@@ -86,14 +89,18 @@ struct AppShoppingItem: Identifiable, Hashable {
     var imageURL: String
 }
 
+typealias StoredShoppingGroup = AppShoppingGroup
+typealias StoredShoppingItem = AppShoppingItem
+
 // MARK: - 2) Groups Screen (Home)
 struct GroupsView: View {
     @State private var groups: [AppShoppingGroup] = [
-        .init(name: "Men's Clothing", apiCategory: "men's clothing"),
-        .init(name: "Women's Clothing", apiCategory: "women's clothing"),
-        .init(name: "Jewelry", apiCategory: "jewelery"),
-        .init(name: "Electronics", apiCategory: "electronics")
+        .init(id: UUID(), name: "Men's Clothing", apiCategory: "men's clothing", isCustom: false, isTaxable: true),
+        .init(id: UUID(), name: "Women's Clothing", apiCategory: "women's clothing", isCustom: false, isTaxable: true),
+        .init(id: UUID(), name: "Jewelry", apiCategory: "jewelery", isCustom: false, isTaxable: true),
+        .init(id: UUID(), name: "Electronics", apiCategory: "electronics", isCustom: false, isTaxable: true)
     ]
+    @State private var showAddGroup = false
 
     var body: some View {
         List {
@@ -103,7 +110,7 @@ struct GroupsView: View {
                         HStack {
                             Text(group.name)
                             Spacer()
-                            Text("Tap to open")
+                            Text(group.isCustom ? "Custom group" : "Tap to open")
                                 .foregroundStyle(.secondary)
                                 .font(.footnote)
                         }
@@ -112,8 +119,41 @@ struct GroupsView: View {
             }
         }
         .navigationTitle("Groups")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showAddGroup = true
+                } label: {
+                    Image(systemName: "folder.badge.plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showAddGroup) {
+            NavigationStack {
+                AddGroupView { newGroup in
+                    groups.append(newGroup)
+                }
+            }
+        }
+        .task {
+            await loadCustomGroups()
+        }
         .navigationDestination(for: AppShoppingGroup.self) { group in
             GroupDetailView(group: group)
+        }
+    }
+
+    private func loadCustomGroups() async {
+        do {
+            let customGroups = try PersistenceController.shared.fetchCustomGroups()
+            let defaultCategories = Set(groups.map(\.apiCategory))
+            let newGroups = customGroups.filter { !defaultCategories.contains($0.apiCategory) }
+
+            if !newGroups.isEmpty {
+                groups.append(contentsOf: newGroups)
+            }
+        } catch {
+            print("Failed to load custom groups: \(error.localizedDescription)")
         }
     }
 }
@@ -134,6 +174,10 @@ struct GroupDetailView: View {
     @AppStorage("electronicsTaxable") private var electronicsTaxable = true
 
     private var taxRate: Double {
+        if group.isCustom {
+            return group.isTaxable ? defaultTaxRate : 0
+        }
+
         switch group.apiCategory.lowercased() {
         case "men's clothing":
             return mensClothingTaxable ? defaultTaxRate : 0
@@ -287,6 +331,9 @@ struct GroupDetailView: View {
                 }
             }
         }
+        .onChange(of: items) { newItems in
+            persistItems(newItems)
+        }
         .task {
             if items.isEmpty {
                 await loadProducts()
@@ -299,6 +346,20 @@ struct GroupDetailView: View {
         errorMessage = nil
 
         do {
+            let storedItems = try PersistenceController.shared.fetchItems(for: group)
+
+            if !storedItems.isEmpty {
+                items = storedItems
+                isLoading = false
+                return
+            }
+
+            if group.isCustom {
+                items = []
+                isLoading = false
+                return
+            }
+
             let products = try await APIService.shared.fetchProducts()
             let filtered = products.filter {
                 $0.category.lowercased() == group.apiCategory.lowercased()
@@ -306,7 +367,8 @@ struct GroupDetailView: View {
 
             items = filtered.map {
                 AppShoppingItem(
-                    id: $0.id,
+                    id: UUID(),
+                    remoteID: $0.id,
                     name: $0.title,
                     price: $0.price,
                     quantity: 1,
@@ -316,11 +378,21 @@ struct GroupDetailView: View {
                     imageURL: $0.image
                 )
             }
+
+            persistItems(items)
         } catch {
             errorMessage = "Failed to load products: \(error.localizedDescription)"
         }
 
         isLoading = false
+    }
+
+    private func persistItems(_ updatedItems: [AppShoppingItem]) {
+        do {
+            try PersistenceController.shared.replaceItems(updatedItems, for: group)
+        } catch {
+            print("Failed to save items: \(error.localizedDescription)")
+        }
     }
 
     private func summaryRow(title: String, value: Double, bold: Bool = false) -> some View {
@@ -373,7 +445,8 @@ struct AddEditItemView: View {
                     let qty = Int(qtyText) ?? 1
 
                     let item = AppShoppingItem(
-                        id: Int.random(in: 10000...99999),
+                        id: UUID(),
+                        remoteID: nil,
                         name: name.isEmpty ? "New Item" : name,
                         price: price,
                         quantity: max(1, qty),
@@ -388,6 +461,56 @@ struct AddEditItemView: View {
                 }
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+        }
+    }
+}
+
+struct AddGroupView: View {
+    var onSave: (AppShoppingGroup) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var isTaxable = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Form {
+            Section("Group Info") {
+                TextField("Group name", text: $name)
+                Toggle("Taxable", isOn: $isTaxable)
+            }
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .navigationTitle("Add Group")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { dismiss() }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") {
+                    saveGroup()
+                }
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private func saveGroup() {
+        do {
+            let group = try PersistenceController.shared.saveCustomGroup(name: name, isTaxable: isTaxable)
+            onSave(group)
+            dismiss()
+        } catch {
+            errorMessage = "Could not save this group right now."
         }
     }
 }
