@@ -345,21 +345,19 @@ struct GroupDetailView: View {
         isLoading = true
         errorMessage = nil
 
+        if let storedItems = loadStoredItems(), !storedItems.isEmpty {
+            items = storedItems
+            isLoading = false
+            return
+        }
+
+        if group.isCustom {
+            items = []
+            isLoading = false
+            return
+        }
+
         do {
-            let storedItems = try PersistenceController.shared.fetchItems(for: group)
-
-            if !storedItems.isEmpty {
-                items = storedItems
-                isLoading = false
-                return
-            }
-
-            if group.isCustom {
-                items = []
-                isLoading = false
-                return
-            }
-
             let products = try await APIService.shared.fetchProducts()
             let filtered = products.filter {
                 $0.category.lowercased() == group.apiCategory.lowercased()
@@ -385,6 +383,15 @@ struct GroupDetailView: View {
         }
 
         isLoading = false
+    }
+
+    private func loadStoredItems() -> [AppShoppingItem]? {
+        do {
+            return try PersistenceController.shared.fetchItems(for: group)
+        } catch {
+            print("Failed to load stored items: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func persistItems(_ updatedItems: [AppShoppingItem]) {
