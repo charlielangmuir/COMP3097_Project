@@ -1,5 +1,62 @@
 import SwiftUI
 
+private enum AppTheme {
+    static let richBlack = Color(hex: "020B13")
+    static let carbonFiber = Color(hex: "262626")
+    static let funkyGold = Color(hex: "DAAB2D")
+    static let bronzeCoin = Color(hex: "A57A03")
+
+    static let appBackground = LinearGradient(
+        colors: [richBlack, carbonFiber.opacity(0.95)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
+    static let cardBackground = Color.white.opacity(0.05)
+    static let cardStroke = Color.white.opacity(0.10)
+}
+
+private extension Color {
+    init(hex: String) {
+        let cleanHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: cleanHex).scanHexInt64(&int)
+
+        let r, g, b: UInt64
+        switch cleanHex.count {
+        case 6:
+            (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (r, g, b) = (0, 0, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: 1
+        )
+    }
+}
+
+private struct ElevatedCard<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(AppTheme.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppTheme.cardStroke, lineWidth: 1)
+            )
+    }
+}
+
 // MARK: - Root (Launch -> Main Tabs)
 struct RootView: View {
     @State private var showMain = false
@@ -17,6 +74,8 @@ struct RootView: View {
                     }
             }
         }
+        .tint(AppTheme.funkyGold)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -24,19 +83,11 @@ struct RootView: View {
 struct LaunchView: View {
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.05, green: 0.05, blue: 0.06),
-                    Color(red: 0.12, green: 0.10, blue: 0.07),
-                    Color(red: 0.20, green: 0.16, blue: 0.09)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            AppTheme.appBackground
             .ignoresSafeArea()
 
             Circle()
-                .fill(Color(red: 0.84, green: 0.69, blue: 0.30).opacity(0.18))
+                .fill(AppTheme.funkyGold.opacity(0.18))
                 .frame(width: 260, height: 260)
                 .blur(radius: 24)
                 .offset(x: 120, y: -250)
@@ -47,20 +98,44 @@ struct LaunchView: View {
                 .blur(radius: 18)
                 .offset(x: -130, y: 260)
 
-            VStack(spacing: 18) {
+            VStack(spacing: 20) {
                 AppLogoMark()
 
                 VStack(spacing: 6) {
                     Text("SmartCart")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.41))
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppTheme.funkyGold)
 
                     Text("Shopping List & Tax Calculator")
                         .font(.headline)
                         .foregroundStyle(.white.opacity(0.92))
                 }
+
+                VStack(spacing: 4) {
+                    Text("Group Members")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.92))
+
+                    VStack(spacing: 2) {
+                        Text("Charlie Langmuir")
+                        Text("Joel Chandra-Paul")
+                        Text("Jingyu He")
+                        Text("Yueyang Peng")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.82))
+                }
             }
             .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(AppTheme.carbonFiber.opacity(0.45))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(AppTheme.bronzeCoin.opacity(0.32), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 24)
         }
     }
 }
@@ -72,8 +147,8 @@ private struct AppLogoMark: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.15, green: 0.13, blue: 0.10),
-                            Color(red: 0.05, green: 0.05, blue: 0.06)
+                            AppTheme.carbonFiber,
+                            AppTheme.richBlack
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -82,25 +157,25 @@ private struct AppLogoMark: View {
                 .frame(width: 110, height: 110)
                 .overlay {
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color(red: 0.84, green: 0.69, blue: 0.30).opacity(0.65), lineWidth: 1.2)
+                        .stroke(AppTheme.funkyGold.opacity(0.65), lineWidth: 1.2)
                 }
                 .shadow(color: .black.opacity(0.28), radius: 20, x: 0, y: 12)
 
             VStack(spacing: 6) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(red: 0.84, green: 0.69, blue: 0.30).opacity(0.18))
+                        .fill(AppTheme.funkyGold.opacity(0.18))
                         .frame(width: 54, height: 42)
 
                     Image(systemName: "cart.fill")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(Color(red: 0.95, green: 0.84, blue: 0.55))
+                        .foregroundStyle(AppTheme.funkyGold)
                 }
 
                 HStack(spacing: 6) {
-                    Circle().fill(Color(red: 0.95, green: 0.84, blue: 0.55)).frame(width: 8, height: 8)
-                    Circle().fill(Color(red: 0.95, green: 0.84, blue: 0.55).opacity(0.72)).frame(width: 8, height: 8)
-                    Circle().fill(Color(red: 0.95, green: 0.84, blue: 0.55).opacity(0.46)).frame(width: 8, height: 8)
+                    Circle().fill(AppTheme.funkyGold).frame(width: 8, height: 8)
+                    Circle().fill(AppTheme.bronzeCoin.opacity(0.85)).frame(width: 8, height: 8)
+                    Circle().fill(AppTheme.bronzeCoin.opacity(0.55)).frame(width: 8, height: 8)
                 }
             }
         }
@@ -126,6 +201,8 @@ struct MainTabView: View {
                 Label("Settings", systemImage: "gearshape")
             }
         }
+        .toolbarBackground(AppTheme.richBlack, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 }
 
@@ -168,18 +245,36 @@ struct GroupsView: View {
             Section("Shopping Groups") {
                 ForEach(groups) { group in
                     NavigationLink(value: group) {
-                        HStack {
-                            Text(group.name)
-                            Spacer()
-                            Text(group.isCustom ? "Custom group" : "Tap to open")
-                                .foregroundStyle(.secondary)
-                                .font(.footnote)
+                        ElevatedCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(group.name)
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+
+                                    Text(group.isCustom ? "Custom group" : "Tap to open")
+                                        .foregroundStyle(.secondary)
+                                        .font(.footnote)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppTheme.bronzeCoin)
+                            }
                         }
                     }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowBackground(Color.clear)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.appBackground.ignoresSafeArea())
         .navigationTitle("Groups")
+        .toolbarBackground(AppTheme.richBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -273,6 +368,7 @@ struct GroupDetailView: View {
         SwiftUI.Group {
             if isLoading {
                 ProgressView("Loading items...")
+                    .tint(AppTheme.funkyGold)
             } else if let errorMessage {
                 VStack(spacing: 12) {
                     Text(errorMessage)
@@ -294,75 +390,81 @@ struct GroupDetailView: View {
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach($items) { $item in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 12) {
-                                        Button {
-                                            item.purchased.toggle()
-                                        } label: {
-                                            Image(systemName: item.purchased ? "checkmark.circle.fill" : "circle")
-                                                .foregroundStyle(item.purchased ? .green : .secondary)
-                                        }
-                                        .buttonStyle(.plain)
+                                ElevatedCard {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 12) {
+                                            Button {
+                                                item.purchased.toggle()
+                                            } label: {
+                                                Image(systemName: item.purchased ? "checkmark.circle.fill" : "circle")
+                                                    .foregroundStyle(item.purchased ? AppTheme.funkyGold : .secondary)
+                                            }
+                                            .buttonStyle(.plain)
 
-                                        AsyncImage(url: URL(string: item.imageURL)) { phase in
-                                            switch phase {
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .scaledToFit()
-                                            case .failure(_):
-                                                Image(systemName: "photo")
-                                                    .resizable()
-                                                    .scaledToFit()
+                                            AsyncImage(url: URL(string: item.imageURL)) { phase in
+                                                switch phase {
+                                                case .success(let image):
+                                                    image
+                                                        .resizable()
+                                                        .scaledToFit()
+                                                case .failure(_):
+                                                    Image(systemName: "photo")
+                                                        .resizable()
+                                                        .scaledToFit()
+                                                        .foregroundStyle(.secondary)
+                                                case .empty:
+                                                    ProgressView()
+                                                        .tint(AppTheme.funkyGold)
+                                                @unknown default:
+                                                    EmptyView()
+                                                }
+                                            }
+                                            .frame(width: 45, height: 45)
+
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(item.name)
+                                                    .strikethrough(item.purchased)
+                                                    .lineLimit(2)
+                                                    .foregroundStyle(.white)
+
+                                                Text(String(format: "$%.2f  x %d", item.price, item.quantity))
+                                                    .font(.footnote)
                                                     .foregroundStyle(.secondary)
-                                            case .empty:
-                                                ProgressView()
-                                            @unknown default:
-                                                EmptyView()
                                             }
-                                        }
-                                        .frame(width: 45, height: 45)
 
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.name)
-                                                .strikethrough(item.purchased)
-                                                .lineLimit(2)
-
-                                            Text(String(format: "$%.2f  x %d", item.price, item.quantity))
-                                                .font(.footnote)
-                                                .foregroundStyle(.secondary)
+                                            Spacer()
                                         }
 
-                                        Spacer()
-                                    }
+                                        HStack(spacing: 12) {
+                                            Spacer()
 
-                                    HStack(spacing: 12) {
-                                        Spacer()
-
-                                        Button {
-                                            if item.quantity > 1 {
-                                                item.quantity -= 1
+                                            Button {
+                                                if item.quantity > 1 {
+                                                    item.quantity -= 1
+                                                }
+                                            } label: {
+                                                Image(systemName: "minus.circle")
+                                                    .foregroundStyle(AppTheme.bronzeCoin)
                                             }
-                                        } label: {
-                                            Image(systemName: "minus.circle")
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .buttonStyle(.plain)
+                                            .buttonStyle(.plain)
 
-                                        Text("Qty \(item.quantity)")
-                                            .font(.footnote)
-                                            .foregroundStyle(.secondary)
-                                            .frame(minWidth: 52)
+                                            Text("Qty \(item.quantity)")
+                                                .font(.footnote.weight(.semibold))
+                                                .foregroundStyle(AppTheme.funkyGold)
+                                                .frame(minWidth: 52)
 
-                                        Button {
-                                            item.quantity += 1
-                                        } label: {
-                                            Image(systemName: "plus.circle")
-                                                .foregroundStyle(.secondary)
+                                            Button {
+                                                item.quantity += 1
+                                            } label: {
+                                                Image(systemName: "plus.circle")
+                                                    .foregroundStyle(AppTheme.bronzeCoin)
+                                            }
+                                            .buttonStyle(.plain)
                                         }
-                                        .buttonStyle(.plain)
                                     }
                                 }
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                .listRowBackground(Color.clear)
                             }
                         }
                     }
@@ -375,7 +477,11 @@ struct GroupDetailView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.appBackground.ignoresSafeArea())
         .navigationTitle(group.name)
+        .toolbarBackground(AppTheme.richBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -502,6 +608,10 @@ struct AddEditItemView: View {
             }
         }
         .navigationTitle("Add Item")
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.appBackground.ignoresSafeArea())
+        .toolbarBackground(AppTheme.richBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -558,6 +668,10 @@ struct AddGroupView: View {
             }
         }
         .navigationTitle("Add Group")
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.appBackground.ignoresSafeArea())
+        .toolbarBackground(AppTheme.richBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -616,5 +730,9 @@ struct TaxSettingsView: View {
             }
         }
         .navigationTitle("Tax Settings")
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.appBackground.ignoresSafeArea())
+        .toolbarBackground(AppTheme.richBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 }
