@@ -308,6 +308,16 @@ struct CheckoutPreview {
 typealias StoredShoppingGroup = AppShoppingGroup
 typealias StoredShoppingItem = AppShoppingItem
 
+enum ProductSortOption: String, CaseIterable, Identifiable {
+    case featured = "Featured"
+    case priceLowToHigh = "Price: Low to High"
+    case priceHighToLow = "Price: High to Low"
+    case nameAToZ = "Name: A to Z"
+    case nameZToA = "Name: Z to A"
+
+    var id: String { rawValue }
+}
+
 enum TaxCalculator {
     static func summary(items: [CheckoutLineItem], coupon: CheckoutCoupon?) -> CheckoutSummary {
         let subtotal = items.reduce(0) { $0 + $1.lineSubtotal }
@@ -444,8 +454,7 @@ final class ShoppingStore: ObservableObject {
             return
         }
 
-        let products = try await APIService.shared.fetchProducts()
-        let filtered = products.filter { $0.category.lowercased() == group.apiCategory.lowercased() }
+        let filtered = try await APIService.shared.fetchProducts(matchingGroup: group.apiCategory)
         let mapped = filtered.map {
             AppShoppingItem(
                 id: UUID(),
@@ -739,9 +748,72 @@ struct GroupDetailView: View {
     @State private var showAddItem = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var searchText = ""
+    @State private var selectedCategory = "All"
+    @State private var sortOption: ProductSortOption = .featured
 
     private var items: [AppShoppingItem] {
         store.items(for: group)
+    }
+
+    private var availableCategories: [String] {
+        let values = Set(items.map(\.category).filter { !$0.isEmpty })
+        return ["All"] + values.sorted()
+    }
+
+    private var filteredItems: [AppShoppingItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        return items
+            .filter { item in
+                (selectedCategory == "All" || item.category == selectedCategory) &&
+                (query.isEmpty ||
+                 item.name.lowercased().contains(query) ||
+                 item.details.lowercased().contains(query) ||
+                 item.category.lowercased().contains(query))
+            }
+            .sorted(by: sortComparator)
+    }
+
+    private var hasActiveFilters: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedCategory != "All"
+    }
+
+    private var sortComparator: (AppShoppingItem, AppShoppingItem) -> Bool {
+        switch sortOption {
+        case .featured:
+            return { lhs, rhs in
+                if lhs.purchased != rhs.purchased {
+                    return !lhs.purchased && rhs.purchased
+                }
+
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        case .priceLowToHigh:
+            return { lhs, rhs in
+                if lhs.price == rhs.price {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+
+                return lhs.price < rhs.price
+            }
+        case .priceHighToLow:
+            return { lhs, rhs in
+                if lhs.price == rhs.price {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+
+                return lhs.price > rhs.price
+            }
+        case .nameAToZ:
+            return { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        case .nameZToA:
+            return { lhs, rhs in
+                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
+            }
+        }
     }
 
     private var preview: CheckoutPreview {
@@ -770,100 +842,31 @@ struct GroupDetailView: View {
     var body: some View {
         SwiftUI.Group {
             if isLoading {
-                ProgressView("Loading items...")
-                    .tint(AppTheme.funkyGold)
+                loadingState
             } else if let errorMessage {
-                EmptyStateCard(title: "Unable to Load Items", systemImage: "exclamationmark.triangle", message: errorMessage)
+                errorState(message: errorMessage)
             } else {
                 List {
+                    controlsSection
+
                     Section("Items") {
                         if items.isEmpty {
-                            Text(group.isCustom ? "No items in this custom group yet." : "No items found for this category.")
-                                .foregroundStyle(.secondary)
+                            EmptyStateCard(
+                                title: "No products yet",
+                                systemImage: group.isCustom ? "square.and.pencil" : "shippingbox",
+                                message: group.isCustom ? "No items in this custom group yet." : "No products were returned for this category."
+                            )
+                            .listRowBackground(Color.clear)
+                        } else if filteredItems.isEmpty {
+                            EmptyStateCard(
+                                title: "No matching products",
+                                systemImage: "magnifyingglass",
+                                message: "Try a different search term, category filter, or sort option."
+                            )
+                            .listRowBackground(Color.clear)
                         } else {
-                            ForEach(items) { item in
-                                ElevatedCard {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        HStack(spacing: 12) {
-                                            Button {
-                                                var updated = item
-                                                updated.purchased.toggle()
-                                                store.updateItem(updated, in: group)
-                                            } label: {
-                                                Image(systemName: item.purchased ? "checkmark.circle.fill" : "circle")
-                                                    .foregroundStyle(item.purchased ? AppTheme.funkyGold : .secondary)
-                                            }
-                                            .buttonStyle(.plain)
-
-                                            AsyncImage(url: URL(string: item.imageURL)) { phase in
-                                                switch phase {
-                                                case .success(let image):
-                                                    image.resizable().scaledToFit()
-                                                case .failure(_):
-                                                    Image(systemName: "photo")
-                                                        .resizable()
-                                                        .scaledToFit()
-                                                        .foregroundStyle(.secondary)
-                                                case .empty:
-                                                    ProgressView().tint(AppTheme.funkyGold)
-                                                @unknown default:
-                                                    EmptyView()
-                                                }
-                                            }
-                                            .frame(width: 45, height: 45)
-
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(item.name)
-                                                    .strikethrough(item.purchased)
-                                                    .lineLimit(2)
-                                                    .foregroundStyle(.white)
-
-                                                Text("\(item.price.currencyText) x \(item.quantity)")
-                                                    .font(.footnote)
-                                                    .foregroundStyle(.secondary)
-
-                                                if !item.details.isEmpty {
-                                                    Text(item.details)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                        .lineLimit(2)
-                                                }
-                                            }
-
-                                            Spacer()
-                                        }
-
-                                        HStack(spacing: 12) {
-                                            Spacer()
-
-                                            Button {
-                                                guard item.quantity > 1 else { return }
-                                                var updated = item
-                                                updated.quantity -= 1
-                                                store.updateItem(updated, in: group)
-                                            } label: {
-                                                Image(systemName: "minus.circle")
-                                                    .foregroundStyle(AppTheme.bronzeCoin)
-                                            }
-                                            .buttonStyle(.plain)
-
-                                            Text("Qty \(item.quantity)")
-                                                .font(.footnote.weight(.semibold))
-                                                .foregroundStyle(AppTheme.funkyGold)
-                                                .frame(minWidth: 52)
-
-                                            Button {
-                                                var updated = item
-                                                updated.quantity += 1
-                                                store.updateItem(updated, in: group)
-                                            } label: {
-                                                Image(systemName: "plus.circle")
-                                                    .foregroundStyle(AppTheme.bronzeCoin)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
+                            ForEach(filteredItems) { item in
+                                productRow(item)
                                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                                 .listRowBackground(Color.clear)
                             }
@@ -906,6 +909,7 @@ struct GroupDetailView: View {
                 }
             }
         }
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search products")
         .sheet(isPresented: $showAddItem) {
             NavigationStack {
                 AddEditItemView(group: group)
@@ -929,12 +933,334 @@ struct GroupDetailView: View {
         isLoading = false
     }
 
+    private var controlsSection: some View {
+        Section("Browse") {
+            Picker("Category", selection: $selectedCategory) {
+                ForEach(availableCategories, id: \.self) { category in
+                    Text(category).tag(category)
+                }
+            }
+
+            Picker("Sort", selection: $sortOption) {
+                ForEach(ProductSortOption.allCases) { option in
+                    Text(option.rawValue).tag(option)
+                }
+            }
+
+            if hasActiveFilters {
+                Button("Clear Search and Filters") {
+                    searchText = ""
+                    selectedCategory = "All"
+                    sortOption = .featured
+                }
+                .foregroundStyle(AppTheme.funkyGold)
+            }
+        }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .tint(AppTheme.funkyGold)
+                .scaleEffect(1.2)
+
+            Text("Loading products...")
+                .foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.appBackground.ignoresSafeArea())
+    }
+
+    private func errorState(message: String) -> some View {
+        VStack(spacing: 16) {
+            EmptyStateCard(
+                title: "Unable to Load Products",
+                systemImage: "wifi.exclamationmark",
+                message: message
+            )
+
+            Button("Try Again") {
+                Task {
+                    await loadProducts()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppTheme.funkyGold)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.appBackground.ignoresSafeArea())
+    }
+
+    private func productRow(_ item: AppShoppingItem) -> some View {
+        ElevatedCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Button {
+                        var updated = item
+                        updated.purchased.toggle()
+                        store.updateItem(updated, in: group)
+                    } label: {
+                        Image(systemName: item.purchased ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(item.purchased ? AppTheme.funkyGold : .secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    productThumbnail(for: item, size: 52)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.name)
+                            .strikethrough(item.purchased)
+                            .lineLimit(2)
+                            .foregroundStyle(.white)
+
+                        Text(item.category)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.funkyGold)
+
+                        Text("\(item.price.currencyText) x \(item.quantity)")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        if !item.details.isEmpty {
+                            Text(item.details)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+
+                    Spacer()
+                }
+
+                HStack(spacing: 12) {
+                    Spacer()
+
+                    Button {
+                        guard item.quantity > 1 else { return }
+                        var updated = item
+                        updated.quantity -= 1
+                        store.updateItem(updated, in: group)
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .foregroundStyle(AppTheme.bronzeCoin)
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("Qty \(item.quantity)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(AppTheme.funkyGold)
+                        .frame(minWidth: 52)
+
+                    Button {
+                        var updated = item
+                        updated.quantity += 1
+                        store.updateItem(updated, in: group)
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .foregroundStyle(AppTheme.bronzeCoin)
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        ProductDetailView(group: group, itemID: item.id)
+                    } label: {
+                        Text("Details")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppTheme.funkyGold)
+                }
+            }
+        }
+    }
+
+    private func productThumbnail(for item: AppShoppingItem, size: CGFloat) -> some View {
+        AsyncImage(url: URL(string: item.imageURL)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+            case .failure(_):
+                Image(systemName: "photo")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+            case .empty:
+                ProgressView()
+                    .tint(AppTheme.funkyGold)
+            @unknown default:
+                EmptyView()
+            }
+        }
+        .frame(width: size, height: size)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+    }
+
     private func summaryRow(title: String, value: Double, bold: Bool = false) -> some View {
         HStack {
             Text(title)
             Spacer()
             Text(value.currencyText)
                 .fontWeight(bold ? .bold : .regular)
+        }
+    }
+}
+
+struct ProductDetailView: View {
+    let group: AppShoppingGroup
+    let itemID: UUID
+
+    @EnvironmentObject private var store: ShoppingStore
+
+    private var item: AppShoppingItem? {
+        store.items(for: group).first(where: { $0.id == itemID })
+    }
+
+    var body: some View {
+        SwiftUI.Group {
+            if let item {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        ElevatedCard {
+                            VStack(spacing: 18) {
+                                detailImage(for: item)
+                                    .frame(height: 240)
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(item.category)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppTheme.funkyGold)
+
+                                    Text(item.name)
+                                        .font(.title2.weight(.bold))
+                                        .foregroundStyle(.white)
+
+                                    Text(item.price.currencyText)
+                                        .font(.title3.weight(.semibold))
+                                        .foregroundStyle(.white.opacity(0.92))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+
+                        ElevatedCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                detailRow(title: "Shopping Group", value: group.name)
+                                detailRow(title: "Unit Price", value: item.price.currencyText)
+                                detailRow(title: "Quantity", value: "\(item.quantity)")
+                                detailRow(title: "Status", value: item.purchased ? "Purchased" : "Active")
+
+                                Divider()
+                                    .overlay(Color.white.opacity(0.08))
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Description")
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+
+                                    Text(item.details.isEmpty ? "No description available." : item.details)
+                                        .font(.body)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        ElevatedCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Text("Quick Actions")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+
+                                Button(item.purchased ? "Mark as Active" : "Mark as Purchased") {
+                                    var updated = item
+                                    updated.purchased.toggle()
+                                    store.updateItem(updated, in: group)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(AppTheme.funkyGold)
+
+                                HStack(spacing: 16) {
+                                    Button("Decrease Quantity") {
+                                        guard item.quantity > 1 else { return }
+                                        var updated = item
+                                        updated.quantity -= 1
+                                        store.updateItem(updated, in: group)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(AppTheme.bronzeCoin)
+                                    .disabled(item.quantity <= 1)
+
+                                    Button("Increase Quantity") {
+                                        var updated = item
+                                        updated.quantity += 1
+                                        store.updateItem(updated, in: group)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(AppTheme.bronzeCoin)
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            } else {
+                EmptyStateCard(
+                    title: "Product unavailable",
+                    systemImage: "shippingbox",
+                    message: "This product could not be found in the current shopping group."
+                )
+                .padding(24)
+            }
+        }
+        .background(AppTheme.appBackground.ignoresSafeArea())
+        .navigationTitle("Product Detail")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(AppTheme.richBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+    }
+
+    private func detailImage(for item: AppShoppingItem) -> some View {
+        AsyncImage(url: URL(string: item.imageURL)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+            case .failure(_):
+                Image(systemName: "photo")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.secondary)
+                    .padding(32)
+            case .empty:
+                ProgressView()
+                    .tint(AppTheme.funkyGold)
+            @unknown default:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+    }
+
+    private func detailRow(title: String, value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(title)
+                .foregroundStyle(.white)
+            Spacer()
+            Text(value)
+                .multilineTextAlignment(.trailing)
+                .foregroundStyle(.secondary)
         }
     }
 }
