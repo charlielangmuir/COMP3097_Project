@@ -11,7 +11,7 @@ struct RootView: View {
             } else {
                 LaunchView()
                     .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
                             showMain = true
                         }
                     }
@@ -24,26 +24,87 @@ struct RootView: View {
 struct LaunchView: View {
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            LinearGradient(
+                colors: [
+                    Color(red: 0.05, green: 0.05, blue: 0.06),
+                    Color(red: 0.12, green: 0.10, blue: 0.07),
+                    Color(red: 0.20, green: 0.16, blue: 0.09)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                Image(systemName: "cart.fill")
-                    .font(.system(size: 44, weight: .bold))
+            Circle()
+                .fill(Color(red: 0.84, green: 0.69, blue: 0.30).opacity(0.18))
+                .frame(width: 260, height: 260)
+                .blur(radius: 24)
+                .offset(x: 120, y: -250)
 
-                Text("Shopping List & Tax Calculator")
-                    .font(.title3)
-                    .bold()
+            Circle()
+                .fill(Color.white.opacity(0.05))
+                .frame(width: 220, height: 220)
+                .blur(radius: 18)
+                .offset(x: -130, y: 260)
 
-                Text("Early Prototype")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            VStack(spacing: 18) {
+                AppLogoMark()
 
-                Text("Using real product data from Fake Store API")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 6) {
+                    Text("SmartCart")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.41))
+
+                    Text("Shopping List & Tax Calculator")
+                        .font(.headline)
+                        .foregroundStyle(.white.opacity(0.92))
+                }
             }
-            .padding()
+            .padding(28)
         }
+    }
+}
+
+private struct AppLogoMark: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.15, green: 0.13, blue: 0.10),
+                            Color(red: 0.05, green: 0.05, blue: 0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 110, height: 110)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color(red: 0.84, green: 0.69, blue: 0.30).opacity(0.65), lineWidth: 1.2)
+                }
+                .shadow(color: .black.opacity(0.28), radius: 20, x: 0, y: 12)
+
+            VStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(red: 0.84, green: 0.69, blue: 0.30).opacity(0.18))
+                        .frame(width: 54, height: 42)
+
+                    Image(systemName: "cart.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(Color(red: 0.95, green: 0.84, blue: 0.55))
+                }
+
+                HStack(spacing: 6) {
+                    Circle().fill(Color(red: 0.95, green: 0.84, blue: 0.55)).frame(width: 8, height: 8)
+                    Circle().fill(Color(red: 0.95, green: 0.84, blue: 0.55).opacity(0.72)).frame(width: 8, height: 8)
+                    Circle().fill(Color(red: 0.95, green: 0.84, blue: 0.55).opacity(0.46)).frame(width: 8, height: 8)
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
